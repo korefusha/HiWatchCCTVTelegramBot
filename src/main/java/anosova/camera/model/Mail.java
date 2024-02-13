@@ -1,6 +1,7 @@
 package anosova.camera.model;
 
 
+import jakarta.mail.Flags;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,8 @@ public class Mail {
     private Date date;
 
     private List <File> attachments;
+
+    private Flags flags;
 
     public Mail(){}
 }

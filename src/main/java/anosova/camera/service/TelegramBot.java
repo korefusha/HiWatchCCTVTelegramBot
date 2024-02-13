@@ -1,37 +1,38 @@
 package anosova.camera.service;
 
 import anosova.camera.config.BotConfig;
+import anosova.camera.config.MailConfig;
+import anosova.camera.mapper.MailMapper;
 import anosova.camera.model.Mail;
+import jakarta.mail.*;
+import jakarta.mail.search.FlagTerm;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.IOUtils;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.commands.GetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
-import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.*;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Component
 @Slf4j
-public class TelegramBot extends TelegramLongPollingBot{
+public class TelegramBot extends TelegramLongPollingBot {
     final BotConfig botConfig;
-
     final MailReceiveClient mailReceiveClient;
-    String path = "C:\\Users\\rebel\\Desktop\\camera\\src\\main\\resources\\img\\image_2023-12-30_16-50-04.png";
-
+    final MailConfig mailConfig;
     //Constructor
-    public TelegramBot(BotConfig botConfig, MailReceiveClient mailReceiveClient){
+    public TelegramBot(BotConfig botConfig, MailReceiveClient mailReceiveClient, MailConfig mailConfig){
         this.botConfig = botConfig;
         this.mailReceiveClient = mailReceiveClient;
+        this.mailConfig = mailConfig;
     }
 
 
@@ -61,26 +62,54 @@ public class TelegramBot extends TelegramLongPollingBot{
             switch (message) {
                 case "/start":
                         startCommandReceived(chatId, update.getMessage().getFrom().getFirstName());
-                        break;
+                    try {
+                        startMailListener(chatId);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                    sendMessage(chatId, "Mail listener has been started");
+                      break;
                 case "/test":
                     testMessage(chatId,message);
                     break;
                 case "/check":
-                    getMail(chatId,message);
+                    try {
+                        getMail(chatId,message);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
                     break;
                 case "/photo":
-                    if (mailReceiveClient.receive().size() != 0) {
-                        for (Mail mail : mailReceiveClient.receive()) {
+                    try {
+                        mailReceiveClient.receive();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                    List<Mail> mailss = mailReceiveClient.receive();
+                    log.info("mailReceiveClient.receive().size() = {}", mailss.size());
+                    if (mailss.size() != 0) {
+                        log.info("Sending new messages");
+                        for (Mail mail : mailss) {
                             try {
                                 sendPhoto(chatId, mail);
                             } catch (TelegramApiException e) {
-                                log.error("Exception in onUpdateReceived.sendPhoto - {}", e.getMessage());
                                 throw new RuntimeException(e);
                             }
                         }
                     } else {
                         sendMessage(chatId, "No mails");
                     }
+                    break;
+                case "/clean":
+                    FileCleanup.deleteFilesOlderThanOneMonth();
+                    break;
+                case "/help":
+                    List<BotCommand> commandsList = getMyCommands();
+                    StringBuilder response = new StringBuilder("Список команд бота:\n");
+                    for (BotCommand command : commandsList) {
+                        response.append("/").append(command.getCommand()).append("\n");
+                    }
+                    sendMessage(update.getMessage().getChatId(),response.toString());
                     break;
                 default:
                     sendMessage(chatId, "Sorry, try again later");
@@ -144,7 +173,7 @@ public class TelegramBot extends TelegramLongPollingBot{
                     execute(sendMedia);
 
                 } catch (TelegramApiException e) {
-                    log.error("Exception in sendPhoto - {}", e.getMessage());
+                    log.error("Exception in sendPhoto, more than 1 attachment - {}", e.getMessage());
                     throw new TelegramApiException();
                 }
             }
@@ -152,16 +181,19 @@ public class TelegramBot extends TelegramLongPollingBot{
             else {
                 SendPhoto msg = new SendPhoto();
                 msg.setChatId(chatId);
-                file = mail.getAttachments().get(0);
-                msg.setPhoto(new InputFile(file));
+                if (mail.getAttachments().get(0).exists()) {
 
+                    file = mail.getAttachments().get(0);
+                    log.info("Attachment exists = {}", file.getPath());
+                }
+                msg.setPhoto(new InputFile(file));
                 msg.setCaption(caption);
 
                 try {
                     execute(msg);
                 }
                 catch (TelegramApiException e) {
-                    log.error("Exception in sendPhoto - {}", e.getMessage());
+                    log.error("Exception in sendPhoto, One attachment - {}", e.getMessage());
                     throw new TelegramApiException();
                 }
             }
@@ -169,9 +201,71 @@ public class TelegramBot extends TelegramLongPollingBot{
     }
 
 
-    private void getMail(long chatId, String textToSend) {
-        List<Mail> mails =  mailReceiveClient.receive();
+    private void getMail(long chatId, String textToSend) throws Exception {
+        List<Mail> mails = mailReceiveClient.receive();
         sendMessage(chatId, "You have " + mails.size() + " messages");
     }
 
+    public void startMailListener(long chatId) throws Exception{
+        String folderName = mailConfig.getFolderName();
+        log.info("folderName = {}", folderName);
+        String protocol = mailConfig.getProtocol();
+        String host = mailConfig.getHost();
+        String user = mailConfig.getUser();
+        String password = mailConfig.getPassword();
+
+        // Настройка Jakarta Mail для прослушивания почты
+        Properties properties = new Properties();
+        properties.put("mail.imap.host", host);
+        properties.put("mail.imap.user", user);
+        properties.put("mail.imap.pass", password);
+        Session emailSession = Session.getDefaultInstance(properties, new ImapAuthenticator(user, password));
+        Store store;
+        try {
+            store = emailSession.getStore(protocol);
+            store.connect(host, user, password);
+
+            Folder folder = store.getFolder(folderName);
+            folder.open(Folder.READ_WRITE);
+            new Thread(() -> {
+                try {
+                    while (true) {
+                        // Получение сообщений
+                        List<Message> messageList = new LinkedList<Message>(Arrays.asList(folder.search(new FlagTerm(new Flags(Flags.Flag.SEEN), false))));
+                        log.info("New messages = {}", messageList.size());
+                        for (Message message : messageList) {
+                            if (!message.getFlags().toString().matches(".*Seen.*")) {
+                                log.info("Message flag is = {}", message.getFlags().toString());
+                                Mail mail = MailMapper.map(message);
+                                sendPhoto(chatId, mail);
+                            } else {
+                                log.info("Message is seen. Delete message");
+                                messageList.remove(message);
+                            }
+                        }
+                        log.info("Finish receiving new mails. Have " + messageList.size() + " new mails");
+                        // Пауза перед повторным поиском писем
+                        Thread.sleep(5000); // 5 секунд
+                        }
+                } catch (Exception e) {
+                    log.error("Exception startMailListener - {}", e.getMessage());
+                    e.printStackTrace();
+                }
+            }).start();
+    }
+         catch (MessagingException e) {
+             log.error("Exception startMailListener - {}", e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    private List<BotCommand> getMyCommands() {
+        GetMyCommands getMyCommands = new GetMyCommands();
+        List<BotCommand> commandsList = null;
+        try {
+            commandsList = execute(getMyCommands);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+        return commandsList;
+    }
 }
