@@ -2,12 +2,9 @@ package anosova.camera.service;
 
 import anosova.camera.mapper.MailMapper;
 import anosova.camera.model.Mail;
-import anosova.camera.scheduler.MailReceiveScheduler;
 import jakarta.mail.*;
-import jakarta.mail.event.MessageCountAdapter;
 import jakarta.mail.event.MessageCountEvent;
 import jakarta.mail.event.MessageCountListener;
-import jakarta.mail.search.FlagTerm;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -53,13 +50,10 @@ public final class MailReceiveClient {
     //method Get new mail
     public List<Mail> receive() {
 
-        Store emailStore = null;
+        Store emailStore;
 
         Properties properties = new Properties();
         properties.put("mail.imap.host", host);
-/*        properties.put("mail.imap.port", port);
-        properties.put("mail.imap.ssl", imapSSL);
-        properties.put("mail.imap.auth", imapAuth);*/
         properties.put("mail.imap.user", user);
         properties.put("mail.imap.pass", password);
         Session emailSession = Session.getDefaultInstance(properties, new ImapAuthenticator(user, password));
@@ -92,7 +86,7 @@ public final class MailReceiveClient {
             });
 
             while (true) {
-                // Проверка новых сообщений каждые 5 секунд
+                //Проверка новых сообщений каждые 5 секунд
                 Thread.sleep(5000);
                 emailFolder.getMessageCount();
             }
