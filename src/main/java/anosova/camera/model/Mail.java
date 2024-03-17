@@ -7,7 +7,6 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -15,7 +14,7 @@ import java.util.List;
 @Slf4j
 @Getter
 @Setter
-public class Mail {
+public class Mail{
 
     private String fromAddress;
     private String fromName;

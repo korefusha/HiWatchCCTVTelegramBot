@@ -30,37 +30,45 @@ public final class MailMapper {
     public static Mail extractMail(Message message) throws Exception {
         Mail mail = new Mail();
         Multipart messageMultipart;
-        Message extractMessage = message;
-        try {
-            messageMultipart = convertToMultipart(extractMessage);
-            fillMailFromMimeMessage(mail, extractMessage);
-            if (messageMultipart!=null) {
-                getAttachments(mail, messageMultipart);
+//        Message extractMessage = message;
+        if (message != null) {
+            try {
+                messageMultipart = convertToMultipart(message);
+                fillMailFromMimeMessage(mail, message);
+                if (messageMultipart != null) {
+                    getAttachments(mail, messageMultipart);
+                }
+
+            } catch (Exception e) {
+                log.error("Exception in extractMail - {}", e.getMessage());
+                throw new Exception(e);
             }
-            return mail;
-        } catch (Exception e) {
-            log.error("Exception in extractMail - {}", e.getMessage());
-            throw new Exception(e);
         }
+        return mail;
+
     }
 
     public static Multipart convertToMultipart(Message message) throws Exception {
-        Multipart multipartMessage;
-        Message thisMessage = message;
-        try {
-            log.debug("Convert mail to Multipart successful = {}", thisMessage.getContentType());
-            Object object = thisMessage.getContent();
-            if (object instanceof Multipart) {
-                multipartMessage = (Multipart) thisMessage.getContent();
-                log.debug("multipartMessage contentType = {}", multipartMessage.getContentType());
-                return multipartMessage;
+
+//        Message thisMessage = message;
+        if (message != null) {
+            Multipart multipartMessage;
+            try {
+                log.debug("Convert mail to Multipart successful = {}", message.getContentType());
+                Object object = message.getContent();
+                if (object instanceof Multipart) {
+                    multipartMessage = (Multipart) message.getContent();
+                    log.debug("multipartMessage contentType = {}", multipartMessage.getContentType());
+                    return multipartMessage;
+                }
+                log.debug("Content is not Multipart = {}", message.getContentType());
+                return null;
+            } catch (Exception e) {
+                log.error("Exception in convertToMultipart - {}" + e.getMessage());
+                throw new Exception(e);
             }
-            log.debug("Content is not Multipart = {}", thisMessage.getContentType());
-            return null;
-        } catch (Exception e) {
-            log.error("Exception in convertToMultipart - {}" + e.getMessage());
-            throw new Exception(e);
-        }
+        } else {
+            return null;        }
     }
 
     public static void fillMailFromMimeMessage(Mail mail, Message message) throws Exception {
@@ -82,6 +90,12 @@ public final class MailMapper {
     }
 
     public static void getAttachments(Mail mail, Multipart multipart) throws Exception {
+        String folderPath = "/src/tmp/";
+        File folder = new File(folderPath);
+        if (!folder.exists()) {
+            folder.mkdirs();
+            log.info("Create folder - {}", folderPath);
+        }
         if (multipart != null) {
             for (int i = 0; i < multipart.getCount(); i++) {
                 BodyPart bodyPart = multipart.getBodyPart(i);
@@ -93,7 +107,7 @@ public final class MailMapper {
                 // -- EDIT -- SECURITY ISSUE --
                 // do not do this in production code -- a malicious email can easily contain this filename: "../etc/passwd", or any other path: They can overwrite _ANY_ file on the system that this code has write access to!
                 if (bodyPart.getFileName().matches(".*\\.jpg")) {
-                    File file = new File("src/tmp/" + LocalDate.now() + bodyPart.getFileName());
+                    File file = new File(folderPath + LocalDate.now() + bodyPart.getFileName());
                     FileOutputStream fos = new FileOutputStream(file);
                     byte[] buf = new byte[4096];
                     int bytesRead;

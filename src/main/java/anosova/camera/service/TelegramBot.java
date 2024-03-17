@@ -234,7 +234,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         List<Message> messageList = new LinkedList<Message>(Arrays.asList(folder.search(new FlagTerm(new Flags(Flags.Flag.SEEN), false))));
                         log.info("New messages = {}", messageList.size());
                         for (Message message : messageList) {
-                            if (!message.getFlags().toString().matches(".*Seen.*")) {
+                            if (message!=null&&!message.getFlags().toString().matches(".*Seen.*")) {
                                 log.info("Message flag is = {}", message.getFlags().toString());
                                 Mail mail = MailMapper.map(message);
                                 sendPhoto(chatId, mail);
