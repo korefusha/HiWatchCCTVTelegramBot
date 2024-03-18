@@ -11,6 +11,8 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.TimeZone;
+
 @Component
 @Slf4j
 public final class MailMapper {
@@ -75,6 +77,11 @@ public final class MailMapper {
         Address[] addressFrom = message.getFrom();
         Address[] addressTo = message.getRecipients(Message.RecipientType.TO);
         Date date = message.getSentDate();
+        // Указываем часовой пояс
+        TimeZone timeZone = TimeZone.getTimeZone("Europe/Moscow"); // Пример временной зоны (Московское время)
+        timeZone.setDefault(timeZone);
+        // Получаем время в заданной временной зоне
+        Date localTime = new Date(date.getTime());
         String from = (addressFrom != null ? addressFrom[0].toString() : null);
         String to = (addressTo != null ? addressTo[0].toString() : null);
         mail.setSubject(subject != null ? subject : "No Subject");
@@ -83,7 +90,7 @@ public final class MailMapper {
         mail.setToAddress(to != null ? to : "No ToAddress");
         mail.setToName(to != null ? to : "No To");
         mail.setAttachments(new ArrayList<>());
-        mail.setDate(date);
+        mail.setDate(localTime);
         mail.setFlags(message.getFlags());
         log.debug("Filling mail complete");
     }
