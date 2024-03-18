@@ -30,11 +30,11 @@ public final class MailMapper {
     public static Mail extractMail(Message message) throws Exception {
         Mail mail = new Mail();
         Multipart messageMultipart;
-//        Message extractMessage = message;
-        if (message != null) {
+        Message extractMessage = message;
+        if (extractMessage != null) {
             try {
-                messageMultipart = convertToMultipart(message);
-                fillMailFromMimeMessage(mail, message);
+                messageMultipart = convertToMultipart(extractMessage);
+                fillMailFromMimeMessage(mail, extractMessage);
                 if (messageMultipart != null) {
                     getAttachments(mail, messageMultipart);
                 }
@@ -45,30 +45,29 @@ public final class MailMapper {
             }
         }
         return mail;
-
     }
 
     public static Multipart convertToMultipart(Message message) throws Exception {
-
-//        Message thisMessage = message;
-        if (message != null) {
+        Message thisMessage = message;
+        if (thisMessage != null) {
             Multipart multipartMessage;
             try {
-                log.debug("Convert mail to Multipart successful = {}", message.getContentType());
-                Object object = message.getContent();
+                log.debug("Convert mail to Multipart successful = {}", thisMessage.getContentType());
+                Object object = thisMessage.getContent();
                 if (object instanceof Multipart) {
-                    multipartMessage = (Multipart) message.getContent();
+                    multipartMessage = (Multipart) thisMessage.getContent();
                     log.debug("multipartMessage contentType = {}", multipartMessage.getContentType());
                     return multipartMessage;
                 }
-                log.debug("Content is not Multipart = {}", message.getContentType());
+                log.debug("Content is not Multipart = {}", thisMessage.getContentType());
                 return null;
             } catch (Exception e) {
                 log.error("Exception in convertToMultipart - {}" + e.getMessage());
                 throw new Exception(e);
             }
         } else {
-            return null;        }
+            return null;
+        }
     }
 
     public static void fillMailFromMimeMessage(Mail mail, Message message) throws Exception {
