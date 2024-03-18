@@ -146,6 +146,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void sendPhoto(long chatId, Mail mail) throws TelegramApiException {
         //file example if attachment can't be found
         File file = new File("C:\\Users\\rebel\\Desktop\\camera\\src\\main\\resources\\img\\image_2023-12-30_16-50-04.png");
+
+
         String caption = System.lineSeparator() + mail.getDate().toString() +
                 System.lineSeparator() +
                 mail.getSubject();
